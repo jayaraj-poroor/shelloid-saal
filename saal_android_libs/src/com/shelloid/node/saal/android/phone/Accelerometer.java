@@ -2,6 +2,9 @@ package com.shelloid.node.saal.android.phone;
 
 import java.security.InvalidParameterException;
 
+import com.shelloid.node.saal.common.Module;
+import com.shelloid.node.saal.common.ShelloidSensor;
+
 import android.content.Context;
 import android.hardware.Sensor;
 import android.hardware.SensorEvent;
@@ -9,8 +12,6 @@ import android.hardware.SensorEventListener;
 import android.hardware.SensorManager;
 import android.util.Log;
 
-import com.shelloid.node.saal.Module;
-import com.shelloid.node.saal.ShelloidSensor;
 
 public class Accelerometer implements ShelloidSensor, SensorEventListener
 {

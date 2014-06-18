@@ -2,6 +2,10 @@ package com.shelloid.node.saal.android.phone;
 
 import java.security.InvalidParameterException;
 
+import com.shelloid.node.saal.common.Module;
+import com.shelloid.node.saal.common.ShelloidSensor;
+import com.shelloid.node.saal.common.exceptions.NoDataAvailableException;
+
 import android.content.Context;
 import android.location.Location;
 import android.location.LocationListener;
@@ -9,9 +13,6 @@ import android.location.LocationManager;
 import android.os.Bundle;
 import android.util.Log;
 
-import com.shelloid.node.saal.Module;
-import com.shelloid.node.saal.NoDataAvailableException;
-import com.shelloid.node.saal.ShelloidSensor;
 
 public class GPS implements ShelloidSensor, LocationListener
 {

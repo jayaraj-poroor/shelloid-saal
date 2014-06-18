@@ -5,8 +5,8 @@ import android.content.Context;
 import android.os.ParcelUuid;
 import android.util.Log;
 
-import com.shelloid.node.saal.ModuleFactory;
 import com.shelloid.node.saal.android.modules.PhoneModule;
+import com.shelloid.node.saal.common.ModuleFactory;
 
 public class AndroidModuleFactory extends ModuleFactory
 {
