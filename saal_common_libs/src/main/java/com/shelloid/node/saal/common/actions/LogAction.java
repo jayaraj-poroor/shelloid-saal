@@ -15,6 +15,7 @@ import com.shelloid.querylib.TimedBufferFactory;
 
 public class LogAction
 {
+    private static final String TAG = "LogAction";
     private static LogAction logAction;
     private final TimedBufferFactory<LogEntry> fact;
 
@@ -24,42 +25,58 @@ public class LogAction
         fact = TimedBufferFactory.getInstance(LogEntry.class);
     }
 
+    @Override
+    public void finalize() throws Throwable
+    {
+        super.finalize();
+    }
+
     public boolean log(long currentTs, Object[] params, String streamId, HashMap<String, Literal> vars)
     {
-        TimedBuffer<LogEntry> buf = fact.getBuffer(streamId + ".stream");
-        long expiryTime = 0;
-        HashMap<String, Literal> loggableVars;
-        if (params.length > 0)
+        boolean res = false;
+        try
         {
-            int startIdx = 0;
-            if (params[0] instanceof Long)
+            TimedBuffer<LogEntry> buf = fact.getBuffer(streamId + ".stream");
+            long expiryTime = 0;
+            HashMap<String, Literal> loggableVars;
+            if (params.length > 0)
             {
-                expiryTime = (Long) params[0];
-                startIdx = 1;
-            }
-            if (params.length > startIdx)
-            {
-                loggableVars = new HashMap<String, Literal>();
-                while (startIdx < params.length)
+                int startIdx = 0;
+                if (params[0] instanceof Long)
                 {
-                    String key = params[startIdx].toString();
-                    if (vars.containsKey(key))
+                    expiryTime = (Long) params[0];
+                    startIdx = 1;
+                }
+                if (params.length > startIdx)
+                {
+                    loggableVars = new HashMap<String, Literal>();
+                    while (startIdx < params.length)
                     {
-                        loggableVars.put(key, vars.get(key));
+                        String key = params[startIdx].toString();
+                        if (vars.containsKey(key))
+                        {
+                            loggableVars.put(key, vars.get(key));
+                        }
+                        startIdx++;
                     }
-                    startIdx++;
+                }
+                else
+                {
+                    loggableVars = vars;
                 }
             }
             else
             {
                 loggableVars = vars;
             }
+            res = buf.addItem(currentTs, expiryTime, new LogEntry(loggableVars));
+            buf.cleanup();
         }
-        else
+        catch (Exception ex)
         {
-            loggableVars = vars;
+            ex.printStackTrace();
         }
-        return buf.addItem(currentTs, expiryTime, new LogEntry(loggableVars));
+        return res;
     }
 
     public ShelloidMessage getMessages(String streamId)
