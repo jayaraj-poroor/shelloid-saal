@@ -15,20 +15,29 @@ import com.shelloid.querylib.TimedBufferFactory;
 
 public class LogAction
 {
-    private static final String TAG = "LogAction";
     private static LogAction logAction;
-    private final TimedBufferFactory<LogEntry> fact;
+    private TimedBufferFactory<LogEntry> fact;
 
     private LogAction(File filesDir)
     {
         TimedBufferFactory.configure(filesDir);
-        fact = TimedBufferFactory.getInstance(LogEntry.class);
+        try
+        {
+            fact = TimedBufferFactory.getInstance(LogEntry.class);
+        }
+        catch (Throwable ex)
+        {
+            TimedBufferFactory.removeInstance("msgbuf");
+            fact = null;
+        }
     }
 
     @Override
     public void finalize() throws Throwable
     {
         super.finalize();
+        System.out.println("LogAction finalize");
+        TimedBufferFactory.removeInstance("msgbuf");
     }
 
     public boolean log(long currentTs, Object[] params, String streamId, HashMap<String, Literal> vars)
@@ -36,6 +45,10 @@ public class LogAction
         boolean res = false;
         try
         {
+            if (fact == null)
+            {
+                fact = TimedBufferFactory.getInstance(LogEntry.class);
+            }
             TimedBuffer<LogEntry> buf = fact.getBuffer(streamId + ".stream");
             long expiryTime = 0;
             HashMap<String, Literal> loggableVars;
@@ -70,64 +83,75 @@ public class LogAction
                 loggableVars = vars;
             }
             res = buf.addItem(currentTs, expiryTime, new LogEntry(loggableVars));
-            buf.cleanup();
+            buf.clear();
         }
-        catch (Exception ex)
+        catch (Throwable ex)
         {
             ex.printStackTrace();
+            res = true;
         }
         return res;
     }
 
     public ShelloidMessage getMessages(String streamId)
     {
-        TimedBuffer<LogEntry> buf = fact.getBuffer(streamId + ".stream");
-        Queue<LogEntry> msgs = buf.getItems();
-        ShelloidMessage msg = new ShelloidMessage();
-        msg.put(MessageFields.type, MessageTypes.STREAM_MSG);
-        msg.put(MessageFields.streamId, streamId);
-        msg.put(MessageFields.subType, MessageTypes.STREAM_LOG);
-        ArrayList<HashMap<String, Object>> msgsArray = new ArrayList<HashMap<String, Object>>();
-        while (msgs.peek() != null)
+            ShelloidMessage msg = new ShelloidMessage();
+        try
         {
-            LogEntry entry = msgs.remove();
-            HashMap<String, Literal> emsg = entry.msg;
-            HashMap<String, String> logs = new HashMap<String, String>();
-            HashMap<String, Object> map = new HashMap<String, Object>();
-            map.put(MessageFields.timestamp, entry.timestamp + "");
-            for (Entry<String, Literal> e : emsg.entrySet())
+            TimedBuffer<LogEntry> buf = fact.getBuffer(streamId + ".stream");
+            Queue<LogEntry> msgs = buf.getItems();
+            msg.put(MessageFields.type, MessageTypes.STREAM_MSG);
+            msg.put(MessageFields.streamId, streamId);
+            msg.put(MessageFields.subType, MessageTypes.STREAM_LOG);
+            ArrayList<HashMap<String, Object>> msgsArray = new ArrayList<HashMap<String, Object>>();
+            while (msgs.peek() != null)
             {
-                String val = "";
-                Literal l = e.getValue();
-                switch (l.kind)
+                LogEntry entry = msgs.remove();
+                HashMap<String, Literal> emsg = entry.msg;
+                HashMap<String, String> logs = new HashMap<String, String>();
+                HashMap<String, Object> map = new HashMap<String, Object>();
+                map.put(MessageFields.timestamp, entry.timestamp + "");
+                for (Entry<String, Literal> e : emsg.entrySet())
                 {
-                    case Literal.DOUBLE:
+                    String val = "";
+                    Literal l = e.getValue();
+                    switch (l.kind)
                     {
-                        val = l.dVal + "";
-                        break;
+                        case Literal.DOUBLE:
+                        {
+                            val = l.dVal + "";
+                            break;
+                        }
+                        case Literal.STRING:
+                        {
+                            val = l.sVal;
+                            break;
+                        }
+                        case Literal.LONG:
+                        {
+                            val = l.lVal + "";
+                            break;
+                        }
+                        default:
+                        {
+                            break;
+                        }
                     }
-                    case Literal.STRING:
-                    {
-                        val = l.sVal;
-                        break;
-                    }
-                    case Literal.LONG:
-                    {
-                        val = l.lVal + "";
-                        break;
-                    }
-                    default:
-                    {
-                        break;
-                    }
+                    logs.put(e.getKey(), val);
                 }
-                logs.put(e.getKey(), val);
+                map.put(MessageFields.msg, logs);
+                msgsArray.add(map);
             }
-            map.put(MessageFields.msg, logs);
-
-            msgsArray.add(map);
+            msg.put(MessageFields.msg, msgsArray.toArray());
         }
-        msg.put(MessageFields.msg, msgsArray.toArray());
+        catch (Exception ex)
+        {
+            ex.printStackTrace();
+            msg.put(MessageFields.type, MessageTypes.STREAM_MSG);
+            msg.put(MessageFields.streamId, streamId);
+            msg.put(MessageFields.subType, MessageTypes.STREAM_DEBUG_LOG);
+            msg.put(MessageFields.msg, ex.getCause().toString());
+        }
         return msg;
     }
 
